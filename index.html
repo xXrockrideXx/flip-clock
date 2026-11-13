@@ -30,7 +30,7 @@
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;background:var(--bg);overflow:hidden}
-  body{position:fixed;inset:0;width:100%;height:100%;color:var(--pilltext);
+  body{position:fixed;top:0;left:0;right:0;width:100%;height:100vh;height:100lvh;color:var(--pilltext);
     font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
     display:flex;align-items:center;justify-content:center;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
@@ -444,7 +444,20 @@ function render(){
 function tick(){ render(); setTimeout(tick, 1000 - (Date.now() % 1000) + 5); }
 
 /* ================= layout ================= */
+function fixHeight(){
+  // iOS home-screen apps under-report the viewport height; use the real screen height there
+  const standalone = navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  let H = Math.max(window.innerHeight, document.documentElement.clientHeight);
+  if (standalone && screen && screen.width){
+    const portraitNow = window.innerHeight >= window.innerWidth;
+    const sh = portraitNow ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+    H = Math.max(H, sh);
+  }
+  document.documentElement.style.height = H + 'px';
+  document.body.style.height = H + 'px';
+}
 function layout(){
+  fixHeight();
   const cs = getComputedStyle(document.body);
   const vw = document.body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const vh = document.body.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);

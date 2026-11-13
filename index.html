@@ -24,6 +24,7 @@
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;background:var(--bg);overflow:hidden}
+  body{position:fixed;inset:0;width:100%;height:100%}
   body{
     color:#fff;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
     display:flex;align-items:center;justify-content:center;
@@ -31,7 +32,7 @@
     user-select:none;-webkit-user-select:none;
   }
   .stage{display:flex;flex-direction:column;align-items:center}
-  body:not(.portrait) .stage{padding-top:50px}
+  body:not(.portrait) .stage{padding-top:56px}
 
   /* ---------- clock layout ---------- */
   .clock{display:flex;gap:calc(var(--w)*.3);perspective:calc(var(--w)*8)}
@@ -271,7 +272,9 @@
 
   /* ---------- sizing ---------- */
   function layout(){
-    const vw = window.innerWidth, vh = window.innerHeight;
+    const cs = getComputedStyle(document.body);
+    const vw = document.body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const vh = document.body.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
     const portrait = vh > vw * 1.05;
     document.body.classList.toggle('portrait', portrait);
     const nPairs = S.sec ? 3 : 2;
@@ -281,12 +284,12 @@
     let w;
     if (portrait){
       const byW = (vw * 0.62) / 2.15;
-      const byH = (vh * 0.86) / (nPairs*1.6 + (nPairs-1)*0.13 + extra);
+      const byH = (vh * 0.9 - 56) / (nPairs*1.6 + (nPairs-1)*0.13 + extra);
       w = Math.min(byW, byH);
     } else {
       const units = nPairs*2 + nPairs*0.15 + (nPairs-1)*0.3;
       const byW = (vw * 0.9) / units;
-      const byH = (vh * 0.86 - 50) / (1.6 + extra);
+      const byH = (vh * 0.9 - 56) / (1.6 + extra);
       w = Math.min(byW, byH);
     }
     document.documentElement.style.setProperty('--w', Math.floor(w) + 'px');

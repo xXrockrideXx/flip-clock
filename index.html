@@ -36,7 +36,8 @@
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     user-select:none;-webkit-user-select:none;transition:background .3s}
   .stage{display:flex;flex-direction:column;align-items:center}
-  body:not(.portrait) .stage{padding-top:56px}
+  .stage{padding-top:64px}
+  body.portrait .stage{padding-top:40px}
 
   /* ---------- clock ---------- */
   .clock{display:flex;gap:calc(var(--w)*.3);perspective:calc(var(--w)*8)}
@@ -468,10 +469,10 @@ function layout(){
   if (!S.hideDate) extra += (portrait ? 0.14 : 0.45) + 0.38 + 0.32;
   let w;
   if (portrait){
-    w = Math.min((vw*0.62)/2.15, (vh*0.9 - 56)/(nPairs*1.6 + (nPairs-1)*0.13 + extra));
+    w = Math.min((vw*0.646)/2.15, (vh - 70)/(nPairs*1.6 + (nPairs-1)*0.13 + extra));
   } else {
     const units = nPairs*2 + nPairs*0.15 + (nPairs-1)*0.3;
-    w = Math.min((vw*0.9)/units, (vh*0.9 - 56)/(1.6 + extra));
+    w = Math.min((vw*0.9)/units, (vh*0.92 - 64)/(1.6 + extra));
   }
   document.documentElement.style.setProperty('--w', Math.floor(w) + 'px');
   applyFit();

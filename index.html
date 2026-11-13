@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<title>Flip Clock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --w: 120px;               /* card width – set by JS */
+    --h: calc(var(--w) * 1.6);
+    --accent: #12d0e6;
+    --card-top: #19191b;
+    --card-bot: #1e1e20;
+    --digit: #ffffff;
+    --bg: #000;
+    --dim: #4a4a4e;
+    --flip: 300ms;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;background:var(--bg);overflow:hidden}
+  body{
+    color:#fff;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+    display:flex;align-items:center;justify-content:center;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    user-select:none;-webkit-user-select:none;
+  }
+  .stage{display:flex;flex-direction:column;align-items:center}
+  body:not(.portrait) .stage{padding-top:50px}
+
+  /* ---------- clock layout ---------- */
+  .clock{display:flex;gap:calc(var(--w)*.3);perspective:calc(var(--w)*8)}
+  .pair{display:flex;gap:calc(var(--w)*.15)}
+  body.portrait .clock{flex-direction:column;gap:calc(var(--w)*.13)}
+  body.noseconds .pair.sec{display:none}
+
+  /* ---------- a flip card ---------- */
+  .card{position:relative;width:var(--w);height:var(--h);border-radius:calc(var(--w)*.16);
+        font-family:"Archivo","Arial Narrow",Impact,sans-serif;font-weight:900;
+        font-variation-settings:"wdth" 66,"wght" 900;font-stretch:condensed;
+        color:var(--digit);font-size:calc(var(--h)*1.0);
+        box-shadow:0 0 0 1px rgba(255,255,255,.035) inset, 0 calc(var(--w)*.03) calc(var(--w)*.08) rgba(0,0,0,.6)}
+  .half,.flap{position:absolute;left:0;width:100%;height:50%;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+  .half span,.flap span{position:absolute;left:0;width:100%;height:var(--h);line-height:var(--h);text-align:center;
+        display:block;transform:translateY(.012em);z-index:1}
+  .top{top:0;background:var(--card-top);border-radius:calc(var(--w)*.16) calc(var(--w)*.16) 0 0}
+  .bottom{top:50%;background:var(--card-bot);border-radius:0 0 calc(var(--w)*.16) calc(var(--w)*.16)}
+  .bottom span{top:-100%}
+  .top span{top:0}
+  .top::after{ /* subtle top-half shading */
+    content:"";position:absolute;inset:0;background:linear-gradient(to bottom,rgba(255,255,255,.015),rgba(0,0,0,.18));pointer-events:none}
+  .bottom::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.25),rgba(0,0,0,0) 30%);pointer-events:none}
+  .card::after{ /* hinge line */
+    content:"";position:absolute;left:0;right:0;top:50%;height:max(2px,calc(var(--w)*.012));
+    transform:translateY(-50%);background:#000;z-index:5}
+  .flap{z-index:3;display:none}
+  .flap.top{transform-origin:50% 100%}
+  .flap.bottom{transform-origin:50% 0%}
+  .card.flipping .flap{display:block}
+  .card.flipping .flap.top{animation:flipTop var(--flip) ease-in forwards}
+  .card.flipping .flap.bottom{transform:rotateX(90deg);animation:flipBot var(--flip) ease-out var(--flip) forwards}
+  @keyframes flipTop{from{transform:rotateX(0)}to{transform:rotateX(-90deg)}}
+  @keyframes flipBot{from{transform:rotateX(90deg)}to{transform:rotateX(0)}}
+  .card.flipping .flap.top::before{content:"";position:absolute;inset:0;z-index:2;background:#000;opacity:0;
+        animation:shadeIn var(--flip) ease-in forwards}
+  @keyframes shadeIn{to{opacity:.35}}
+
+  .ampm{position:absolute;z-index:6;left:calc(var(--w)*.09);top:calc(var(--w)*.08);
+        font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:calc(var(--w)*.11);
+        letter-spacing:.08em;color:#8a8a90;display:none}
+  body.h12 .ampm{display:block}
+
+  /* ---------- date + weekdays ---------- */
+  .date{margin-top:calc(var(--w)*.45);background:#1c1c1e;border-radius:calc(var(--w)*.07);
+        padding:calc(var(--w)*.07) calc(var(--w)*.15);font-size:calc(var(--w)*.215);
+        letter-spacing:.14em;white-space:nowrap;line-height:1.2}
+  body.portrait .date{margin-top:calc(var(--w)*.14)}
+  .week{display:flex;gap:calc(var(--w)*.15);margin-top:calc(var(--w)*.12);font-size:calc(var(--w)*.13)}
+  .week span{color:var(--dim);width:1ch;text-align:center}
+  .week span.on{color:#fff;font-weight:600}
+  body.nodate .date{display:none}
+  body.noweek .week{display:none}
+  body.nodate .week{margin-top:calc(var(--w)*.4)}
+
+  /* ---------- gear ---------- */
+  .gear{position:fixed;z-index:20;top:calc(env(safe-area-inset-top) + 16px);right:calc(env(safe-area-inset-right) + 16px);
+        width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;
+        background:radial-gradient(circle at 50% 45%,#1c1c1e 55%,#141416 100%);
+        box-shadow:0 0 0 1px rgba(255,255,255,.04),0 4px 14px rgba(0,0,0,.7);
+        display:grid;place-items:center;transition:opacity .6s}
+  .gear svg{width:28px;height:28px;color:var(--accent);transition:transform .4s}
+  .gear:hover svg{transform:rotate(30deg)}
+  body.idle .gear{opacity:.12}
+  body.idle{cursor:none}
+
+  /* ---------- settings sheet ---------- */
+  .scrim{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+         display:none;align-items:center;justify-content:center;padding:20px}
+  .scrim.open{display:flex}
+  .sheet{width:min(420px,100%);max-height:90vh;overflow:auto;background:#1c1c1e;border-radius:18px;padding:8px 0 14px;
+         box-shadow:0 20px 60px rgba(0,0,0,.8);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .sheet h2{font-size:17px;font-weight:600;text-align:center;padding:12px 0 10px;position:relative}
+  .sheet h2 button{position:absolute;right:14px;top:8px;background:none;border:none;color:var(--accent);font-size:16px;font-weight:600;cursor:pointer}
+  .group{margin:10px 16px 0;background:#2c2c2e;border-radius:12px;overflow:hidden}
+  .glabel{margin:18px 30px 6px;font-size:12px;color:#8e8e93;text-transform:uppercase;letter-spacing:.05em}
+  .row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;font-size:16px;min-height:48px}
+  .row+.row{border-top:1px solid #3a3a3c}
+  .row small{display:block;color:#8e8e93;font-size:12px;margin-top:2px}
+  .tog{position:relative;width:51px;height:31px;flex:none}
+  .tog input{opacity:0;width:0;height:0;position:absolute}
+  .tog i{position:absolute;inset:0;background:#48484a;border-radius:31px;transition:.25s;cursor:pointer}
+  .tog i::after{content:"";position:absolute;width:27px;height:27px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.25s;box-shadow:0 2px 4px rgba(0,0,0,.3)}
+  .tog input:checked+i{background:var(--accent)}
+  .tog input:checked+i::after{transform:translateX(20px)}
+  .swatches{display:flex;gap:10px}
+  .swatches button{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;outline:none}
+  .swatches button.sel{border-color:#fff;box-shadow:0 0 0 2px #2c2c2e inset}
+  .btn{width:100%;background:none;border:none;color:var(--accent);font-size:16px;text-align:left;cursor:pointer;font-family:inherit}
+  .note{color:#8e8e93;font-size:12px;margin:8px 30px 0;line-height:1.4}
+</style>
+</head>
+<body>
+<button class="gear" id="gearBtn" aria-label="Settings">
+  <svg viewBox="0 0 64 64" fill="none" stroke="currentColor">
+    <circle cx="32" cy="32" r="25" stroke-width="5" stroke-dasharray="2.2 2.7"/>
+    <circle cx="32" cy="32" r="21" stroke-width="3"/>
+    <g stroke-width="3" stroke-linecap="round">
+      <line x1="32" y1="32" x2="32" y2="12"/>
+      <line x1="32" y1="32" x2="49.3" y2="42"/>
+      <line x1="32" y1="32" x2="14.7" y2="42"/>
+    </g>
+    <circle cx="32" cy="32" r="3" fill="currentColor" stroke="none"/>
+  </svg>
+</button>
+
+<div class="stage">
+  <div class="clock" id="clock">
+    <div class="pair hr"></div>
+    <div class="pair min"></div>
+    <div class="pair sec"></div>
+  </div>
+  <div class="date" id="date">—</div>
+  <div class="week" id="week"></div>
+</div>
+
+<div class="scrim" id="scrim">
+  <div class="sheet" role="dialog" aria-label="Settings">
+    <h2>Settings <button id="doneBtn">Done</button></h2>
+
+    <div class="glabel">Clock</div>
+    <div class="group">
+      <label class="row">24-hour time <span class="tog"><input type="checkbox" data-k="h24"><i></i></span></label>
+      <label class="row">Show seconds <span class="tog"><input type="checkbox" data-k="sec"><i></i></span></label>
+      <label class="row">Show date <span class="tog"><input type="checkbox" data-k="date"><i></i></span></label>
+      <label class="row">Show weekdays <span class="tog"><input type="checkbox" data-k="week"><i></i></span></label>
+      <label class="row"><span>Flip sound<small>Soft click on each flip</small></span><span class="tog"><input type="checkbox" data-k="sound"><i></i></span></label>
+    </div>
+
+    <div class="glabel">Appearance</div>
+    <div class="group">
+      <div class="row">Accent
+        <div class="swatches" id="swatches"></div>
+      </div>
+      <div class="row">Digits
+        <div class="swatches" id="digitSw"></div>
+      </div>
+      <label class="row"><span>Dim gear when idle<small>Fades after 4 seconds</small></span><span class="tog"><input type="checkbox" data-k="idle"><i></i></span></label>
+    </div>
+
+    <div class="glabel">Display</div>
+    <div class="group">
+      <div class="row"><button class="btn" id="fsBtn">Enter full screen</button></div>
+      <label class="row"><span>Keep screen awake<small id="wakeNote">While this page is open</small></span><span class="tog"><input type="checkbox" id="wakeTog"><i></i></span></label>
+    </div>
+    <p class="note">Tip: turn your phone sideways for the six-card layout. Settings are remembered on this device.</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  const DEF = {h24:true, sec:true, date:true, week:true, sound:false, idle:true, accent:'#12d0e6', digit:'#ffffff'};
+  let S = {...DEF};
+  try { Object.assign(S, JSON.parse(localStorage.getItem('flipclock') || '{}')); } catch(e){}
+  const save = () => { try { localStorage.setItem('flipclock', JSON.stringify(S)); } catch(e){} };
+
+  const ACCENTS = ['#12d0e6','#30d158','#ff9f0a','#ff375f','#bf5af2','#ffffff'];
+  const DIGITS  = ['#ffffff','#f2e6c9','#ff9f0a','#30d158','#12d0e6'];
+
+  /* ---------- build cards ---------- */
+  function makeCard(){
+    const c = document.createElement('div');
+    c.className = 'card';
+    c.innerHTML = '<div class="half top"><span></span></div><div class="half bottom"><span></span></div>' +
+                  '<div class="flap top"><span></span></div><div class="flap bottom"><span></span></div>';
+    c._v = null;
+    return c;
+  }
+  const pairs = [...document.querySelectorAll('.pair')];
+  const cards = [];
+  pairs.forEach(p => { for (let i=0;i<2;i++){ const c = makeCard(); p.appendChild(c); cards.push(c); } });
+  const ampm = document.createElement('div'); ampm.className = 'ampm'; cards[0].appendChild(ampm);
+
+  /* ---------- sound ---------- */
+  let actx = null;
+  function click(){
+    if (!S.sound || !actx) return;
+    try {
+      const len = Math.floor(actx.sampleRate * 0.025);
+      const buf = actx.createBuffer(1, len, actx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i=0;i<len;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 4);
+      const src = actx.createBufferSource(); src.buffer = buf;
+      const f = actx.createBiquadFilter(); f.type='bandpass'; f.frequency.value = 2200; f.Q.value = 0.8;
+      const g = actx.createGain(); g.gain.value = 0.35;
+      src.connect(f).connect(g).connect(actx.destination); src.start();
+    } catch(e){}
+  }
+
+  /* ---------- flipping ---------- */
+  function setCard(c, v, animate){
+    if (c._v === v) return;
+    const old = c._v;
+    const q = s => c.querySelector(s + ' span');
+    if (!animate || old === null || document.hidden){
+      c.classList.remove('flipping');
+      q('.half.top').textContent = v; q('.half.bottom').textContent = v;
+      c._v = v; return;
+    }
+    // static top shows new, static bottom keeps old until flap lands
+    q('.half.top').textContent = v;
+    q('.half.bottom').textContent = old;
+    q('.flap.top').textContent = old;
+    q('.flap.bottom').textContent = v;
+    c.classList.remove('flipping'); void c.offsetWidth; c.classList.add('flipping');
+    c._v = v;
+    clearTimeout(c._t);
+    c._t = setTimeout(() => {
+      q('.half.bottom').textContent = c._v;
+      c.classList.remove('flipping');
+    }, 620);
+    click();
+  }
+
+  /* ---------- date ---------- */
+  const MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  const week = document.getElementById('week');
+  'MTWTFSS'.split('').forEach(l => { const s = document.createElement('span'); s.textContent = l; week.appendChild(s); });
+  const dateEl = document.getElementById('date');
+
+  let first = true;
+  function render(){
+    const n = new Date();
+    let h = n.getHours();
+    if (!S.h24){ ampm.textContent = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12; }
+    const str = String(h).padStart(2,'0') + String(n.getMinutes()).padStart(2,'0') + String(n.getSeconds()).padStart(2,'0');
+    cards.forEach((c,i) => setCard(c, str[i], !first));
+    first = false;
+    dateEl.textContent = `${n.getDate()} ${MONTHS[n.getMonth()]} ${n.getFullYear()}`;
+    const wd = (n.getDay() + 6) % 7; // Monday = 0
+    [...week.children].forEach((s,i) => s.classList.toggle('on', i === wd));
+  }
+  function tick(){
+    render();
+    setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
+  }
+
+  /* ---------- sizing ---------- */
+  function layout(){
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const portrait = vh > vw * 1.05;
+    document.body.classList.toggle('portrait', portrait);
+    const nPairs = S.sec ? 3 : 2;
+    let extra = 0;                                   // height below the cards, in card-widths
+    if (S.date) extra += portrait ? 0.14 + 0.38 : 0.45 + 0.38;
+    if (S.week) extra += 0.12 + 0.2;
+    let w;
+    if (portrait){
+      const byW = (vw * 0.62) / 2.15;
+      const byH = (vh * 0.86) / (nPairs*1.6 + (nPairs-1)*0.13 + extra);
+      w = Math.min(byW, byH);
+    } else {
+      const units = nPairs*2 + nPairs*0.15 + (nPairs-1)*0.3;
+      const byW = (vw * 0.9) / units;
+      const byH = (vh * 0.86 - 50) / (1.6 + extra);
+      w = Math.min(byW, byH);
+    }
+    document.documentElement.style.setProperty('--w', Math.floor(w) + 'px');
+  }
+
+  /* ---------- apply settings ---------- */
+  function apply(){
+    const b = document.body.classList;
+    b.toggle('h12', !S.h24); b.toggle('noseconds', !S.sec);
+    b.toggle('nodate', !S.date); b.toggle('noweek', !S.week);
+    document.documentElement.style.setProperty('--accent', S.accent);
+    document.documentElement.style.setProperty('--digit', S.digit);
+    document.querySelectorAll('[data-k]').forEach(i => i.checked = !!S[i.dataset.k]);
+    paintSwatches();
+    layout();
+    first = true; render();
+  }
+  function swatchRow(el, list, key){
+    el.innerHTML = '';
+    list.forEach(col => {
+      const b = document.createElement('button');
+      b.style.background = col; b.setAttribute('aria-label', col);
+      if (S[key] === col) b.classList.add('sel');
+      b.onclick = e => { e.preventDefault(); S[key] = col; save(); apply(); };
+      el.appendChild(b);
+    });
+  }
+  function paintSwatches(){
+    swatchRow(document.getElementById('swatches'), ACCENTS, 'accent');
+    swatchRow(document.getElementById('digitSw'), DIGITS, 'digit');
+  }
+  document.querySelectorAll('[data-k]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      S[inp.dataset.k] = inp.checked; save();
+      if (inp.dataset.k === 'sound' && inp.checked && !actx){
+        try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+      }
+      apply();
+    });
+  });
+
+  /* ---------- settings sheet ---------- */
+  const scrim = document.getElementById('scrim');
+  document.getElementById('gearBtn').onclick = () => scrim.classList.add('open');
+  document.getElementById('doneBtn').onclick = () => scrim.classList.remove('open');
+  scrim.addEventListener('click', e => { if (e.target === scrim) scrim.classList.remove('open'); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') scrim.classList.remove('open'); });
+
+  /* full screen */
+  const fsBtn = document.getElementById('fsBtn');
+  const fsLabel = () => fsBtn.textContent = document.fullscreenElement ? 'Exit full screen' : 'Enter full screen';
+  fsBtn.onclick = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else { await document.documentElement.requestFullscreen(); scrim.classList.remove('open'); }
+    } catch(e){ fsBtn.textContent = 'Full screen not available here'; }
+  };
+  document.addEventListener('fullscreenchange', () => { fsLabel(); layout(); });
+  document.addEventListener('dblclick', e => { if (!scrim.contains(e.target)) fsBtn.onclick(); });
+
+  /* wake lock */
+  let lock = null;
+  const wakeTog = document.getElementById('wakeTog'), wakeNote = document.getElementById('wakeNote');
+  async function getLock(){
+    try { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); return true; }
+    catch(e){ return false; }
+  }
+  wakeTog.addEventListener('change', async () => {
+    if (wakeTog.checked){
+      if (!(await getLock())){ wakeTog.checked = false; wakeNote.textContent = 'Not supported in this browser'; }
+    } else if (lock){ lock.release(); lock = null; }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden){ if (wakeTog.checked && !lock) getLock(); first = true; render(); }
+  });
+
+  /* idle fade */
+  let idleT;
+  function wake(){
+    document.body.classList.remove('idle');
+    clearTimeout(idleT);
+    if (S.idle) idleT = setTimeout(() => { if (!scrim.classList.contains('open')) document.body.classList.add('idle'); }, 4000);
+  }
+  ['mousemove','touchstart','keydown'].forEach(ev => document.addEventListener(ev, wake, {passive:true}));
+
+  window.addEventListener('resize', layout);
+  window.addEventListener('orientationchange', () => setTimeout(layout, 200));
+  if (document.fonts) document.fonts.ready.then(layout);
+
+  apply(); wake(); tick();
+})();
+</script>
+</body>
+</html>

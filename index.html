@@ -90,6 +90,7 @@
   .week span{color:var(--dim);width:1ch;text-align:center}
   .week span.on{color:var(--dayon);font-weight:600}
   body.nodate .date,body.nodate .week{display:none}
+  body.nodatebox .date{background:transparent!important;box-shadow:none!important}
 
   /* ---------- gear ---------- */
   .gear{position:fixed;z-index:20;top:calc(env(safe-area-inset-top) + 16px);right:calc(env(safe-area-inset-right) + 16px);
@@ -234,7 +235,7 @@ const DEF = {
   font:'impact', weight:500,
   six:false, gradient:false, c1:null, c2:'#4fcfe0',
   sixCols:['#ff453a','#ff9f0a','#ffd60a','#30d158','#0a84ff','#bf5af2'],
-  cardTint:null, accent:'#4fcfe0',
+  cardTint:null, accent:'#4fcfe0', dateBox:true, dateBoxMatch:true, dateBoxCol:'#2c2c2e',
   hourly:false, hourSound:'chime', tick:false, vibrate:false
 };
 let S = JSON.parse(JSON.stringify(DEF));
@@ -498,8 +499,11 @@ function applyColours(){
   if (S.cardTint){
     bs.setProperty('--card-bot', S.cardTint);
     bs.setProperty('--card-top', `color-mix(in srgb, ${S.cardTint} 90%, black)`);
-    bs.setProperty('--pill', S.cardTint);
-  } else { ['--card-bot','--card-top','--pill'].forEach(v => bs.removeProperty(v)); }
+  } else { ['--card-bot','--card-top'].forEach(v => bs.removeProperty(v)); }
+  document.body.classList.toggle('nodatebox', !S.dateBox);
+  if (!S.dateBoxMatch) bs.setProperty('--pill', S.dateBoxCol);
+  else if (S.cardTint) bs.setProperty('--pill', S.cardTint);
+  else bs.setProperty('--pill', 'var(--card-bot)');
   // date + weekday text follow the digit colour
   const txt = S.six ? S.sixCols[0] : c1;
   if (S.c1 || S.six || grad){ bs.setProperty('--pilltext', txt); bs.setProperty('--dayon', txt); }
@@ -559,6 +563,7 @@ function buildSheet(){
   h += tog('noBorder','border','Hide Digit Border','A basic digit background without a border.');
   h += tog('nightstand','moon','Nightstand Mode','Use nightstand mode to prevent your device screen from sleeping whilst using the app.','nsRow');
   h += tog('hideDate','eyeoff','Hide Date Text','Just the clock. No date text.');
+  h += tog('dateBox','border','Date Box','Show the box behind the date. Set its colour under Colours.');
   h += exp('datestyle', I.cal, 'Date Style') + '<div class="sub">';
   [['full','Full Length Date'],['long','Long Date'],['medium','Medium Date'],['compact','Compact Date']].forEach(([v,l]) =>
     h += opt('dateStyle', v, l, `<small>${fmtDate(today, v)}</small>`));
@@ -596,6 +601,10 @@ function buildSheet(){
       <div class="subrow" id="c2Row"><span class="txt"><b>Second Colour</b></span>${colourInput('c2')}</div>
     </div>`;
   h += `<div class="row"><span class="ic">${I.border}</span><span class="txt"><b>Card Tint</b><small><a href="#" id="cardReset" style="color:var(--accent);text-decoration:none">Reset to default</a></small></span>${colourInput('cardTint')}</div>`;
+  h += exp('datebox', ringIcon('ringBox'), 'Date Box Tint') + `<div class="sub">
+      <label class="subrow"><span class="txt"><b>Match Clock Cards</b><small>Use the same colour as the clock card background.</small></span><span class="tog"><input type="checkbox" data-k="dateBoxMatch"><i></i></span></label>
+      <div class="subrow" id="boxRow"><span class="txt"><b>Box Colour</b><small>Used when Match Clock Cards is off.</small></span>${colourInput('dateBoxCol')}</div>
+    </div>`;
   h += `<div class="row"><span class="ic">${I.fade}</span><span class="txt"><b>Accent Tint</b><small>Settings button and highlights</small></span>${colourInput('accent')}</div>`;
   h += '</div>';
 
@@ -624,6 +633,7 @@ function getCol(key){
   if (key.startsWith('six')) return S.sixCols[+key.slice(3)];
   if (key === 'c1') return S.c1 || (isLight() ? '#000000' : '#ffffff');
   if (key === 'cardTint') return S.cardTint || (isLight() ? '#ffffff' : '#1e1e20');
+  if (key === 'dateBoxCol') return S.dateBoxMatch ? getCol('cardTint') : S.dateBoxCol;
   return S[key];
 }
 function setCol(key, v){
@@ -671,6 +681,9 @@ function syncSheet(){
     const v = getCol(inp.dataset.ck); inp.value = v; inp.previousElementSibling.style.background = v;
   });
   document.querySelector('#ringTint b').style.background = S.six ? `conic-gradient(${S.sixCols.join(',')},${S.sixCols[0]})` : S.gradient ? `linear-gradient(${getCol('c1')},${S.c2})` : getCol('c1');
+  document.getElementById('boxRow').style.opacity = S.dateBoxMatch ? .4 : 1;
+  document.getElementById('boxRow').style.pointerEvents = S.dateBoxMatch ? 'none' : '';
+  document.querySelector('#ringBox b').style.background = S.dateBox ? getCol('dateBoxCol') : 'transparent';
   document.getElementById('sixRow').style.display = S.six ? 'flex' : 'none';
   document.querySelector('#c2Row').style.opacity = (S.gradient && !S.six) ? 1 : .4;
   document.querySelector('#c1Row').style.opacity = S.six ? .4 : 1;

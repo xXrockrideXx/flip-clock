@@ -147,7 +147,7 @@
   .tog i::after{content:"";position:absolute;width:30px;height:30px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.25s;box-shadow:0 2px 4px rgba(0,0,0,.3)}
   .tog input:checked+i{background:var(--accent)}
   .tog input:checked+i::after{transform:translateX(22px)}
-  .subrow{display:flex;align-items:center;gap:16px;padding:12px 18px 12px 46px;position:relative}
+  .subrow{cursor:pointer;display:flex;align-items:center;gap:16px;padding:12px 18px 12px 46px;position:relative}
   .subrow .txt b{font-weight:400;font-size:19px;display:block}
   .subrow .txt small{display:block;color:#98989d;font-size:14px;margin-top:3px;line-height:1.3}
   .subrow .txt{flex:1}
@@ -486,17 +486,24 @@ function digitColour(i){
   return S.c1 || (isLight() ? '#000000' : '#ffffff');
 }
 function applyColours(){
-  const root = document.documentElement.style;
   const light = isLight();
+  const bs = document.body.style;   // set on <body> so light/dark defaults can't override custom colours
   document.body.classList.toggle('light', light);
-  document.body.classList.toggle('grad', S.gradient && !S.six);
-  root.setProperty('--accent', S.accent);
-  root.setProperty('--c1', S.c1 || (light ? '#000' : '#fff'));
-  root.setProperty('--c2', S.c2);
+  const grad = S.gradient && !S.six;
+  document.body.classList.toggle('grad', grad);
+  const c1 = S.c1 || (light ? '#000000' : '#ffffff');
+  bs.setProperty('--accent', S.accent);
+  bs.setProperty('--c1', c1);
+  bs.setProperty('--c2', S.c2);
   if (S.cardTint){
-    root.setProperty('--card-bot', S.cardTint);
-    root.setProperty('--card-top', `color-mix(in srgb, ${S.cardTint} 90%, black)`);
-  } else { root.removeProperty('--card-bot'); root.removeProperty('--card-top'); }
+    bs.setProperty('--card-bot', S.cardTint);
+    bs.setProperty('--card-top', `color-mix(in srgb, ${S.cardTint} 90%, black)`);
+    bs.setProperty('--pill', S.cardTint);
+  } else { ['--card-bot','--card-top','--pill'].forEach(v => bs.removeProperty(v)); }
+  // date + weekday text follow the digit colour
+  const txt = S.six ? S.sixCols[0] : c1;
+  if (S.c1 || S.six || grad){ bs.setProperty('--pilltext', txt); bs.setProperty('--dayon', txt); }
+  else { bs.removeProperty('--pilltext'); bs.removeProperty('--dayon'); }
   cards.forEach((c,i) => c.style.setProperty('--dc', digitColour(i)));
   document.querySelectorAll('.mcard').forEach((c,i) => c.style.setProperty('--dc', digitColour(i+2)));
   document.querySelector('meta[name=theme-color]').content = light ? '#f2f2f7' : '#000000';
@@ -582,9 +589,9 @@ function buildSheet(){
   h += exp('digittint', ringIcon('ringTint'), 'Digit Tint') + `<div class="sub">
       <div class="preview"><h4>${I.bino} LIVE PREVIEW</h4><div class="ptile" id="ptile"></div></div>
       <div class="info grey">${I.info}<span>The colour scheme shown above is used for the main clock. Changes apply straight away.</span></div>
-      <div class="subrow"><span class="txt"><b>Apply Six Colours</b><small>When applied, six colours take priority over gradients and individual colours.</small></span><span class="tog"><input type="checkbox" data-k="six"><i></i></span></div>
+      <label class="subrow"><span class="txt"><b>Apply Six Colours</b><small>When applied, six colours take priority over gradients and individual colours.</small></span><span class="tog"><input type="checkbox" data-k="six"><i></i></span></label>
       <div class="sixrow" id="sixRow"></div>
-      <div class="subrow"><span class="txt"><b>Apply Gradient</b><small>When applied, gradients take priority over individual colours.</small></span><span class="tog"><input type="checkbox" data-k="gradient"><i></i></span></div>
+      <label class="subrow"><span class="txt"><b>Apply Gradient</b><small>When applied, gradients take priority over individual colours. Fades from First Colour (top) to Second Colour (bottom).</small></span><span class="tog"><input type="checkbox" data-k="gradient"><i></i></span></label>
       <div class="subrow" id="c1Row"><span class="txt"><b>First Colour</b><small><a href="#" id="c1Reset" style="color:var(--accent);text-decoration:none">Reset to default</a></small></span>${colourInput('c1')}</div>
       <div class="subrow" id="c2Row"><span class="txt"><b>Second Colour</b></span>${colourInput('c2')}</div>
     </div>`;
@@ -595,7 +602,7 @@ function buildSheet(){
   /* Sounds */
   h += sec('speaker','Sounds &amp; Haptics') + '<div class="group">';
   h += exp('newhour', I.hour, 'New Hour') + '<div class="sub">';
-  h += `<div class="subrow"><span class="txt"><b>Play Every Hour</b><small>Tap a sound to hear it. Cuckoo Clock calls once per hour.</small></span><span class="tog"><input type="checkbox" data-k="hourly"><i></i></span></div>`;
+  h += `<label class="subrow"><span class="txt"><b>Play Every Hour</b><small>Tap a sound to hear it. Cuckoo Clock calls once per hour.</small></span><span class="tog"><input type="checkbox" data-k="hourly"><i></i></span></label>`;
   SOUND_LIST.forEach(([v,l]) => h += opt('hourSound', v, l));
   h += '</div>';
   h += tog('tick','tick','Clock Tick','A soft tick every second.');

@@ -57,8 +57,13 @@
   .top span{top:var(--dy)}
   .bottom span{top:calc(var(--h) / -2 + var(--dy))}
   body.grad .half span,body.grad .flap span{
-    background:linear-gradient(to bottom,var(--c1),var(--c2));-webkit-background-clip:text;background-clip:text;
+    background-image:var(--gimg);background-repeat:no-repeat;-webkit-background-clip:text;background-clip:text;
     color:transparent;-webkit-text-fill-color:transparent}
+  body.gwhole .clock .half span,body.gwhole .clock .flap span{
+    background-size:var(--gw) var(--gh);background-position:var(--bx) var(--by)}
+  body.gwhole.gh .mcard .half span{background-size:600% 100%}
+  body.gwhole.gh .mcard:nth-child(1) .half span{background-position:40% 0}
+  body.gwhole.gh .mcard:nth-child(2) .half span{background-position:60% 0}
   .top{top:0;background:var(--card-top);border-radius:calc(var(--w)*.16) calc(var(--w)*.16) 0 0}
   .bottom{top:50%;background:var(--card-bot);border-radius:0 0 calc(var(--w)*.16) calc(var(--w)*.16)}
   .top::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,rgba(255,255,255,.015),rgba(0,0,0,.18));pointer-events:none}
@@ -153,6 +158,9 @@
   .subrow .txt small{display:block;color:#98989d;font-size:14px;margin-top:3px;line-height:1.3}
   .subrow .txt{flex:1}
   .subrow+.subrow::before{content:"";position:absolute;top:0;left:46px;right:0;height:1px;background:#3a3a3c}
+  .opt.sm{font-size:21px;padding:7px 18px 7px 46px;gap:22px}
+  .opt.sm .rad{width:28px;height:28px}
+  .optlabel{padding:12px 18px 4px 46px;font-size:15px;color:#98989d;text-transform:uppercase;letter-spacing:.05em}
   .opt{display:flex;align-items:center;gap:26px;padding:9px 18px 9px 46px;cursor:pointer;color:var(--accent);font-size:27px;line-height:1.15}
   .opt .rad{flex:none;width:32px;height:32px;border-radius:50%;border:2.5px solid var(--accent);display:grid;place-items:center}
   .opt.sel .rad{background:var(--accent)}
@@ -233,7 +241,7 @@ const DEF = {
   simple:false, noBorder:false, nightstand:false, hideDate:false, dateStyle:'long', appearance:'dark',
   h24:true, autoHide:true,
   font:'impact', weight:500,
-  six:false, gradient:false, c1:null, c2:'#4fcfe0',
+  six:false, sixStyle:'solid', gradDir:'v', gradAcross:'digit', gradient:false, c1:null, c2:'#4fcfe0',
   sixCols:['#ff453a','#ff9f0a','#ffd60a','#30d158','#0a84ff','#bf5af2'],
   cardTint:null, accent:'#4fcfe0', dateBox:true, dateBoxMatch:true, dateBoxCol:'#2c2c2e',
   hourly:false, hourSound:'chime', tick:false, vibrate:false
@@ -308,6 +316,21 @@ function applyFit(){
   document.querySelectorAll('.mcard').forEach(m => {
     const b = fit(96);
     m.style.setProperty('--fs', b.fs + 'px'); m.style.setProperty('--dy', b.dy + 'px');
+  });
+  placeGradient(a.dy);
+}
+// For gradients that run across the whole clock: give each card's text a slice of one big gradient
+function placeGradient(dy){
+  if (!document.body.classList.contains('gwhole')) return;
+  const clock = document.getElementById('clock'), kr = clock.getBoundingClientRect();
+  if (dy == null) dy = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dy')) || 0;
+  document.body.style.setProperty('--gw', kr.width + 'px');
+  document.body.style.setProperty('--gh', kr.height + 'px');
+  cards.forEach(c => {
+    if (!c.offsetParent) return;
+    const r = c.getBoundingClientRect();
+    c.style.setProperty('--bx', -(r.left - kr.left) + 'px');
+    c.style.setProperty('--by', -(r.top - kr.top + dy) + 'px');
   });
 }
 
@@ -490,9 +513,15 @@ function applyColours(){
   const light = isLight();
   const bs = document.body.style;   // set on <body> so light/dark defaults can't override custom colours
   document.body.classList.toggle('light', light);
-  const grad = S.gradient && !S.six;
-  document.body.classList.toggle('grad', grad);
   const c1 = S.c1 || (light ? '#000000' : '#ffffff');
+  const dir = S.gradDir === 'h' ? 'to right' : 'to bottom';
+  const blend = S.six && S.sixStyle === 'blend';
+  const grad = blend || (S.gradient && !S.six);
+  const whole = blend || (grad && S.gradAcross === 'clock');
+  document.body.classList.toggle('grad', grad);
+  document.body.classList.toggle('gwhole', whole);
+  document.body.classList.toggle('gh', S.gradDir === 'h');
+  if (grad) bs.setProperty('--gimg', blend ? `linear-gradient(${dir},${S.sixCols.join(',')})` : `linear-gradient(${dir},${c1},${S.c2})`);
   bs.setProperty('--accent', S.accent);
   bs.setProperty('--c1', c1);
   bs.setProperty('--c2', S.c2);
@@ -552,7 +581,7 @@ const sec = (icon, title) => `<div class="shdr"><span class="si">${I[icon]}</spa
 const tog = (k, icon, title, sub, id) => `<label class="row" ${id?`id="${id}"`:''}><span class="ic">${I[icon]}</span><span class="txt"><b>${title}</b>${sub?`<small>${sub}</small>`:''}</span><span class="tog"><input type="checkbox" data-k="${k}"><i></i></span></label>`;
 const exp = (id, icon, title) => `<div class="row exp" data-exp="${id}"><span class="ic">${icon}</span><span class="txt"><b>${title}</b></span>${I.chev}</div>`;
 const ringIcon = id => `<span class="ring" id="${id}"><b></b></span>`;
-const opt = (group, val, label, extra='', style='') => `<div class="opt" data-g="${group}" data-v="${val}"><span class="rad"></span><span style="${style}">${label}${extra}</span></div>`;
+const opt = (group, val, label, extra='', style='', sm=false) => `<div class="opt${sm?' sm':''}" data-g="${group}" data-v="${val}"><span class="rad"></span><span style="${style}">${label}${extra}</span></div>`;
 
 function buildSheet(){
   const today = new Date();
@@ -595,10 +624,22 @@ function buildSheet(){
       <div class="preview"><h4>${I.bino} LIVE PREVIEW</h4><div class="ptile" id="ptile"></div></div>
       <div class="info grey">${I.info}<span>The colour scheme shown above is used for the main clock. Changes apply straight away.</span></div>
       <label class="subrow"><span class="txt"><b>Apply Six Colours</b><small>When applied, six colours take priority over gradients and individual colours.</small></span><span class="tog"><input type="checkbox" data-k="six"><i></i></span></label>
-      <div class="sixrow" id="sixRow"></div>
-      <label class="subrow"><span class="txt"><b>Apply Gradient</b><small>When applied, gradients take priority over individual colours. Fades from First Colour (top) to Second Colour (bottom).</small></span><span class="tog"><input type="checkbox" data-k="gradient"><i></i></span></label>
+      <div id="sixOpts"><div class="sixrow" id="sixRow"></div>
+        <div class="optlabel">Six Colour Style</div>
+        ${opt('sixStyle','solid','Solid – one colour per digit','', '', true)}
+        ${opt('sixStyle','blend','Blended – colours fade into each other','', '', true)}
+      </div>
+      <label class="subrow"><span class="txt"><b>Apply Gradient</b><small>When applied, gradients take priority over individual colours. Fades from First Colour to Second Colour.</small></span><span class="tog"><input type="checkbox" data-k="gradient"><i></i></span></label>
       <div class="subrow" id="c1Row"><span class="txt"><b>First Colour</b><small><a href="#" id="c1Reset" style="color:var(--accent);text-decoration:none">Reset to default</a></small></span>${colourInput('c1')}</div>
       <div class="subrow" id="c2Row"><span class="txt"><b>Second Colour</b></span>${colourInput('c2')}</div>
+      <div id="dirOpts">
+        <div class="optlabel">Gradient Direction</div>
+        ${opt('gradDir','v','Vertical – top to bottom','', '', true)}
+        ${opt('gradDir','h','Horizontal – left to right','', '', true)}
+        <div id="acrossOpts"><div class="optlabel">Gradient Spread</div>
+        ${opt('gradAcross','digit','Each digit on its own','', '', true)}
+        ${opt('gradAcross','clock','Across the whole clock','', '', true)}</div>
+      </div>
     </div>`;
   h += `<div class="row"><span class="ic">${I.border}</span><span class="txt"><b>Card Tint</b><small><a href="#" id="cardReset" style="color:var(--accent);text-decoration:none">Reset to default</a></small></span>${colourInput('cardTint')}</div>`;
   h += exp('datebox', ringIcon('ringBox'), 'Date Box Tint') + `<div class="sub">
@@ -680,11 +721,14 @@ function syncSheet(){
   sb.querySelectorAll('input[type=color]').forEach(inp => {
     const v = getCol(inp.dataset.ck); inp.value = v; inp.previousElementSibling.style.background = v;
   });
-  document.querySelector('#ringTint b').style.background = S.six ? `conic-gradient(${S.sixCols.join(',')},${S.sixCols[0]})` : S.gradient ? `linear-gradient(${getCol('c1')},${S.c2})` : getCol('c1');
+  document.querySelector('#ringTint b').style.background = (S.six && S.sixStyle==='blend') ? `linear-gradient(${S.sixCols.join(',')})` : S.six ? `conic-gradient(${S.sixCols.join(',')},${S.sixCols[0]})` : S.gradient ? `linear-gradient(${getCol('c1')},${S.c2})` : getCol('c1');
   document.getElementById('boxRow').style.opacity = S.dateBoxMatch ? .4 : 1;
   document.getElementById('boxRow').style.pointerEvents = S.dateBoxMatch ? 'none' : '';
   document.querySelector('#ringBox b').style.background = S.dateBox ? getCol('dateBoxCol') : 'transparent';
-  document.getElementById('sixRow').style.display = S.six ? 'flex' : 'none';
+  document.getElementById('sixOpts').style.display = S.six ? 'block' : 'none';
+  const blendOn = S.six && S.sixStyle === 'blend', gradOn = S.gradient && !S.six;
+  document.getElementById('dirOpts').style.display = (blendOn || gradOn) ? 'block' : 'none';
+  document.getElementById('acrossOpts').style.display = gradOn ? 'block' : 'none';
   document.querySelector('#c2Row').style.opacity = (S.gradient && !S.six) ? 1 : .4;
   document.querySelector('#c1Row').style.opacity = S.six ? .4 : 1;
   document.querySelector('#ptile').classList.toggle('lt', isLight());
